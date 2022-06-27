@@ -11,5 +11,14 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Ignore Makefile
+Makefile
+
+# Ignore YAML files
+*.yml 
+
+# Ignore vscode
+.vscode/*
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
