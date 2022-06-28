@@ -25,31 +25,6 @@ func NewHandler(store godiscuss.Store) *Handler {
 		r.Post("/{id}/delete", h.ThreadsDelete())
 	})
 
-	h.Get("/html", func(w http.ResponseWriter, r *http.Request) {
-		t := template.Must(template.New("layout.html").ParseGlob("templates/includes/*.html"))
-		t = template.Must(t.ParseFiles("templates/layout.html", "templates/childtemplate.html"))
-
-		type params struct {
-			Title   string
-			Text    string
-			Lines   []string
-			Number1 int
-			Number2 int
-		}
-
-		t.Execute(w, params{
-			Title: "Golang discussion board",
-			Text:  "Welcome to our discussion board",
-			Lines: []string{
-				"Lines 1",
-				"Lines 2",
-				"Lines 3",
-			},
-			Number1: 33,
-			Number2: 33,
-		})
-	})
-
 	return h
 }
 
