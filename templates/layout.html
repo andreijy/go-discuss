@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  {{block "header" .}}{{end}}
+
+  <h1>{{.Title}}</h1>
+  {{template "paragraph" .Text}}
+  {{template "paragraph" .Text}}
+  {{template "paragraph" .Text}}
+  <ul>
+    {{range .Lines}}
+      <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{if eq .Number1 .Number2}}
+    Numbers are equal
+  {{else}}
+    Numbers are not the same
+  {{end}}
+
+  <br />
+
+  {{block "content" .}}
+  This is the default content
+  {{end}}
+
+  {{block "footer" .}}
+  {{end}}
+</body>
+</html>
