@@ -29,7 +29,7 @@ func (s *CommentStore) Comment(id uuid.UUID) (godiscuss.Comment, error) {
 
 func (s *CommentStore) CommentsByPost(postID uuid.UUID) ([]godiscuss.Comment, error) {
 	var cc []godiscuss.Comment
-	err := s.Select(&cc, `SELECT * FROM comments WHERE post_id=$1`, postID)
+	err := s.Select(&cc, `SELECT * FROM comments WHERE post_id=$1 ORDER BY votes DESC`, postID)
 	if err != nil {
 		return []godiscuss.Comment{}, fmt.Errorf("error getting comments: %w", err)
 	}
@@ -49,7 +49,7 @@ func (s *CommentStore) CreateComment(c *godiscuss.Comment) error {
 }
 
 func (s *CommentStore) UpdateComment(c *godiscuss.Comment) error {
-	err := s.Get(c, `UPDATE comments SET post_id=$1, content=$2, votes=$3 WHERE id=$4`,
+	err := s.Get(c, `UPDATE comments SET post_id=$1, content=$2, votes=$3 WHERE id=$4 RETURNING *`,
 		c.PostID,
 		c.Content,
 		c.Votes,
