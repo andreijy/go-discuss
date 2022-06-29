@@ -29,7 +29,35 @@ func (s *PostStore) Post(id uuid.UUID) (godiscuss.Post, error) {
 
 func (s *PostStore) PostsByThread(threadID uuid.UUID) ([]godiscuss.Post, error) {
 	var pp []godiscuss.Post
-	err := s.Select(&pp, `SELECT * FROM posts WHERE thread_id=$1`, threadID)
+	var query = `
+		SELECT 
+			posts.*,
+			COUNT(comments.*) AS comments_count
+		FROM posts 
+		LEFT JOIN comments ON comments.post_id = posts.id
+		WHERE thread_id=$1 
+		GROUP BY posts.id
+		ORDER BY votes DESC`
+	err := s.Select(&pp, query, threadID)
+	if err != nil {
+		return []godiscuss.Post{}, fmt.Errorf("error getting posts: %w", err)
+	}
+	return pp, nil
+}
+
+func (s *PostStore) Posts() ([]godiscuss.Post, error) {
+	var pp []godiscuss.Post
+	var query = `
+		SELECT 
+			posts.*,
+			COUNT(comments.*) AS comments_count,
+			threads.title AS thread_title
+		FROM posts 
+		LEFT JOIN comments ON comments.post_id = posts.id
+		LEFT JOIN threads ON threads.id = posts.thread_id
+		GROUP BY posts.id, threads.title
+		ORDER BY votes DESC`
+	err := s.Select(&pp, query)
 	if err != nil {
 		return []godiscuss.Post{}, fmt.Errorf("error getting posts: %w", err)
 	}
