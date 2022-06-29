@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -18,11 +17,16 @@ func NewHandler(store godiscuss.Store) *Handler {
 	}
 
 	h.Use(middleware.Logger)
+	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
 		r.Get("/", h.ThreadsList())
 		r.Get("/new", h.ThreadsCreate())
 		r.Post("/", h.ThreadsStore())
+		r.Get("/{id}", h.ThreadsShow())
 		r.Post("/{id}/delete", h.ThreadsDelete())
+		r.Get("/{id}/new", h.PostsCreate())
+		r.Post("/{id}", h.PostsStore())
+		r.Get("/{threadID}/{postID}", h.PostsShow())
 	})
 
 	return h
@@ -34,56 +38,62 @@ type Handler struct {
 	store godiscuss.Store
 }
 
-const threadsListHTML = `
-<h1>Threads</h1>
-<dl>
-{{range .}}
-	<dt><strong>{{.Title}}</strong></dt>
-	<dd>{{.Description}}</dd>
-	<dd>
-	<form action="/threads/{{.ID}}/delete" method="POST">
-		<button type="submit">Delete</button>
-	</form>
-	</dd>
-{{end}}
-</dl>
-<a href="/threads/new">Create thread</a>
-`
+func (h *Handler) Home() http.HandlerFunc {
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		tmpl.Execute(w, nil)
+	}
+}
 
 func (h *Handler) ThreadsList() http.HandlerFunc {
-	tmpl := template.Must(template.New("").Parse(threadsListHTML))
+	type data struct {
+		Threads []godiscuss.Thread
+	}
 
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/threads.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		tt, err := h.store.Threads()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		tmpl.Execute(w, tt)
+		tmpl.Execute(w, data{Threads: tt})
 	}
 }
 
-const threadCreateHTML = `
-<h1>New Thread</h1>
-<form action="/threads" method="POST">
-	<table>
-		<tr>
-			<td>Title</td>
-			<td><input type="text" name="title"></td>
-		</tr>
-		<tr>
-			<td>Description</td>
-			<td><input type="text" name="description"></td>
-		</tr>
-	</table>
-	<button type="submit">Create thread</button>
-</form>
-`
-
 func (h *Handler) ThreadsCreate() http.HandlerFunc {
-	tmpl := template.Must(template.New("").Parse(threadCreateHTML))
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/thread_create.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		tmpl.Execute(w, nil)
+	}
+}
+
+func (h *Handler) ThreadsShow() http.HandlerFunc {
+	type data struct {
+		Thread godiscuss.Thread
+		Posts  []godiscuss.Post
+	}
+
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/thread.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		uuid, err := uuid.Parse(idStr)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		t, err := h.store.Thread(uuid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pp, err := h.store.PostsByThread(t.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tmpl.Execute(w, data{Thread: t, Posts: pp})
 	}
 }
 
@@ -109,7 +119,6 @@ func (h *Handler) ThreadsStore() http.HandlerFunc {
 func (h *Handler) ThreadsDelete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
-		fmt.Println("delete")
 		uuid, err := uuid.Parse(idStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -122,5 +131,87 @@ func (h *Handler) ThreadsDelete() http.HandlerFunc {
 		}
 
 		http.Redirect(w, r, "/threads", http.StatusFound)
+	}
+}
+
+func (h *Handler) PostsCreate() http.HandlerFunc {
+	type data struct {
+		Thread godiscuss.Thread
+	}
+
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/post_create.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		uuid, err := uuid.Parse(idStr)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		t, err := h.store.Thread(uuid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tmpl.Execute(w, data{Thread: t})
+	}
+}
+
+func (h *Handler) PostsShow() http.HandlerFunc {
+	type data struct {
+		Post godiscuss.Post
+	}
+
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/post.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "postID")
+		postID, err := uuid.Parse(idStr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		p, err := h.store.Post(postID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tmpl.Execute(w, data{Post: p})
+	}
+}
+
+func (h *Handler) PostsStore() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		title := r.FormValue("title")
+		content := r.FormValue("content")
+
+		idStr := chi.URLParam(r, "id")
+		threadID, err := uuid.Parse(idStr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		t, err := h.store.Thread(threadID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		p := &godiscuss.Post{
+			ID:       uuid.New(),
+			ThreadID: t.ID,
+			Title:    title,
+			Content:  content,
+		}
+
+		err = h.store.CreatePost(p)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/threads/"+t.ID.String()+"/"+p.ID.String(), http.StatusFound)
 	}
 }

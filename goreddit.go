@@ -13,7 +13,7 @@ type Post struct {
 	ThreadID uuid.UUID `db:"thread_id"`
 	Title    string    `db:"title"`
 	Content  string    `db:"content"`
-	Votes    int       `db:"votest"`
+	Votes    int       `db:"votes"`
 }
 
 type Comment struct {
