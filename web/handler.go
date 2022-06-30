@@ -7,6 +7,7 @@ import (
 	godiscuss "github.com/andreijy/go-discuss"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gorilla/csrf"
 )
 
 func NewHandler(store godiscuss.Store) *Handler {
@@ -18,7 +19,13 @@ func NewHandler(store godiscuss.Store) *Handler {
 	postHandler := PostHandler{store: store}
 	commentHandler := CommentHandler{store: store}
 
+	csrfKey := []byte("01234567890123456789012345678901")
+
 	h.Use(middleware.Logger)
+
+	// TODO: for https only, replace with
+	// TODO: h.Use(csrf.Protect(csrfKey))
+	h.Use(csrf.Protect(csrfKey, csrf.Secure(false)))
 	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
 		r.Get("/", threadHandler.List())

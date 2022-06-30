@@ -7,6 +7,7 @@ import (
 	godiscuss "github.com/andreijy/go-discuss"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
 type PostHandler struct {
@@ -16,6 +17,7 @@ type PostHandler struct {
 func (h *PostHandler) Create() http.HandlerFunc {
 	type data struct {
 		Thread godiscuss.Thread
+		CSRF   template.HTML
 	}
 
 	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/post_create.html"))
@@ -32,7 +34,7 @@ func (h *PostHandler) Create() http.HandlerFunc {
 			return
 		}
 
-		tmpl.Execute(w, data{Thread: t})
+		tmpl.Execute(w, data{Thread: t, CSRF: csrf.TemplateField(r)})
 	}
 }
 
@@ -40,6 +42,7 @@ func (h *PostHandler) Show() http.HandlerFunc {
 	type data struct {
 		Post     godiscuss.Post
 		Comments []godiscuss.Comment
+		CSRF     template.HTML
 	}
 
 	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/post.html"))
@@ -63,7 +66,7 @@ func (h *PostHandler) Show() http.HandlerFunc {
 			return
 		}
 
-		tmpl.Execute(w, data{Post: p, Comments: cc})
+		tmpl.Execute(w, data{Post: p, Comments: cc, CSRF: csrf.TemplateField(r)})
 	}
 }
 
