@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/alexedwards/scs/v2"
 	godiscuss "github.com/andreijy/go-discuss"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -11,11 +12,13 @@ import (
 )
 
 type PostHandler struct {
-	store godiscuss.Store
+	store    godiscuss.Store
+	sessions *scs.SessionManager
 }
 
 func (h *PostHandler) Create() http.HandlerFunc {
 	type data struct {
+		SessionData
 		Thread godiscuss.Thread
 		CSRF   template.HTML
 	}
@@ -34,12 +37,17 @@ func (h *PostHandler) Create() http.HandlerFunc {
 			return
 		}
 
-		tmpl.Execute(w, data{Thread: t, CSRF: csrf.TemplateField(r)})
+		tmpl.Execute(w, data{
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			Thread:      t,
+			CSRF:        csrf.TemplateField(r),
+		})
 	}
 }
 
 func (h *PostHandler) Show() http.HandlerFunc {
 	type data struct {
+		SessionData
 		Post     godiscuss.Post
 		Comments []godiscuss.Comment
 		CSRF     template.HTML
@@ -66,7 +74,12 @@ func (h *PostHandler) Show() http.HandlerFunc {
 			return
 		}
 
-		tmpl.Execute(w, data{Post: p, Comments: cc, CSRF: csrf.TemplateField(r)})
+		tmpl.Execute(w, data{
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			Post:        p,
+			Comments:    cc,
+			CSRF:        csrf.TemplateField(r),
+		})
 	}
 }
 
@@ -100,6 +113,8 @@ func (h *PostHandler) Store() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		h.sessions.Put(r.Context(), "flash", "Your new post has been created.")
 
 		http.Redirect(w, r, "/threads/"+t.ID.String()+"/"+p.ID.String(), http.StatusFound)
 	}

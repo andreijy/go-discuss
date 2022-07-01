@@ -4,28 +4,32 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/alexedwards/scs/v2"
 	godiscuss "github.com/andreijy/go-discuss"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/csrf"
 )
 
-func NewHandler(store godiscuss.Store) *Handler {
+func NewHandler(store godiscuss.Store, sessions *scs.SessionManager) *Handler {
 	h := &Handler{
-		Mux:   chi.NewMux(),
-		store: store,
+		Mux:      chi.NewMux(),
+		store:    store,
+		sessions: sessions,
 	}
-	threadHandler := ThreadHandler{store: store}
-	postHandler := PostHandler{store: store}
-	commentHandler := CommentHandler{store: store}
+
+	threadHandler := ThreadHandler{store: store, sessions: sessions}
+	postHandler := PostHandler{store: store, sessions: sessions}
+	commentHandler := CommentHandler{store: store, sessions: sessions}
 
 	csrfKey := []byte("01234567890123456789012345678901")
 
 	h.Use(middleware.Logger)
-
 	// TODO: for https only, replace with
 	// TODO: h.Use(csrf.Protect(csrfKey))
 	h.Use(csrf.Protect(csrfKey, csrf.Secure(false)))
+	h.Use(sessions.LoadAndSave)
+
 	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
 		r.Get("/", threadHandler.List())
@@ -47,13 +51,16 @@ func NewHandler(store godiscuss.Store) *Handler {
 type Handler struct {
 	*chi.Mux
 
-	store godiscuss.Store
+	store    godiscuss.Store
+	sessions *scs.SessionManager
 }
 
 func (h *Handler) Home() http.HandlerFunc {
 	type data struct {
+		SessionData
 		Posts []godiscuss.Post
 	}
+
 	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/home.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
 		pp, err := h.store.Posts()
@@ -61,6 +68,10 @@ func (h *Handler) Home() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		tmpl.Execute(w, data{Posts: pp})
+
+		tmpl.Execute(w, data{
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			Posts:       pp,
+		})
 	}
 }
