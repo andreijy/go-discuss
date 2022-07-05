@@ -16,6 +16,7 @@ type PostHandler struct {
 	sessions *scs.SessionManager
 }
 
+// To handle r.Get("/{id}/new", postHandler.Create())
 func (h *PostHandler) Create() http.HandlerFunc {
 	type data struct {
 		SessionData
@@ -45,6 +46,7 @@ func (h *PostHandler) Create() http.HandlerFunc {
 	}
 }
 
+// To handle r.Get("/{threadID}/{postID}", postHandler.Show())
 func (h *PostHandler) Show() http.HandlerFunc {
 	type data struct {
 		SessionData
@@ -83,10 +85,19 @@ func (h *PostHandler) Show() http.HandlerFunc {
 	}
 }
 
+// To handle r.Post("/{id}", postHandler.Store())
 func (h *PostHandler) Store() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		title := r.FormValue("title")
-		content := r.FormValue("content")
+		form := CreatePostForm{
+			Title:   r.FormValue("title"),
+			Content: r.FormValue("content"),
+		}
+
+		if !form.Validate() {
+			h.sessions.Put(r.Context(), "form", form)
+			http.Redirect(w, r, r.Referer(), http.StatusFound)
+			return
+		}
 
 		idStr := chi.URLParam(r, "id")
 		threadID, err := uuid.Parse(idStr)
@@ -104,8 +115,8 @@ func (h *PostHandler) Store() http.HandlerFunc {
 		p := &godiscuss.Post{
 			ID:       uuid.New(),
 			ThreadID: t.ID,
-			Title:    title,
-			Content:  content,
+			Title:    form.Title,
+			Content:  form.Content,
 		}
 
 		err = h.store.CreatePost(p)
@@ -120,6 +131,7 @@ func (h *PostHandler) Store() http.HandlerFunc {
 	}
 }
 
+// To handle r.Get("/{threadID}/{postID}/vote", postHandler.Vote())
 func (h *PostHandler) Vote() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "postID")

@@ -16,7 +16,16 @@ type CommentHandler struct {
 
 func (h *CommentHandler) Store() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		content := r.FormValue("content")
+		form := CreateCommentForm{
+			Content: r.FormValue("content"),
+		}
+
+		if !form.Validate() {
+			h.sessions.Put(r.Context(), "form", form)
+			http.Redirect(w, r, r.Referer(), http.StatusFound)
+			return
+		}
+
 		idStr := chi.URLParam(r, "postID")
 
 		postID, err := uuid.Parse(idStr)
@@ -28,7 +37,7 @@ func (h *CommentHandler) Store() http.HandlerFunc {
 		c := &godiscuss.Comment{
 			ID:      uuid.New(),
 			PostID:  postID,
-			Content: content,
+			Content: form.Content,
 		}
 
 		err = h.store.CreateComment(c)
