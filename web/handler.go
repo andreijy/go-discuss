@@ -21,6 +21,7 @@ func NewHandler(store godiscuss.Store, sessions *scs.SessionManager) *Handler {
 	threadHandler := ThreadHandler{store: store, sessions: sessions}
 	postHandler := PostHandler{store: store, sessions: sessions}
 	commentHandler := CommentHandler{store: store, sessions: sessions}
+	userHandler := UserHandler{store: store, sessions: sessions}
 
 	csrfKey := []byte("01234567890123456789012345678901")
 
@@ -44,6 +45,8 @@ func NewHandler(store godiscuss.Store, sessions *scs.SessionManager) *Handler {
 		r.Post("/{threadID}/{postID}", commentHandler.Store())
 	})
 	h.Get("/comments/{id}/vote", commentHandler.Vote())
+	h.Get("/register", userHandler.Register())
+	h.Post("/register", userHandler.RegisterSubmit())
 
 	return h
 }
