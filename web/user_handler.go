@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 
@@ -25,8 +24,6 @@ func (h *UserHandler) Register() http.HandlerFunc {
 	}
 	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/user_register.html"))
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("here0")
-
 		tmpl.Execute(w, data{
 			SessionData: GetSessionData(h.sessions, r.Context()),
 			CSRF:        csrf.TemplateField(r)})
@@ -36,27 +33,22 @@ func (h *UserHandler) Register() http.HandlerFunc {
 // To handle h.Post("/register", userHandler.RegisterSubmit())
 func (h *UserHandler) RegisterSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("here0")
-
 		form := RegisterForm{
 			Username:      r.FormValue("username"),
 			Password:      r.FormValue("password"),
 			UsernameTaken: false,
 		}
-		fmt.Println("here1")
+
 		_, err := h.store.UserByUsername(form.Username)
 		if err == nil {
 			form.UsernameTaken = true
 		}
-
-		fmt.Println("here2")
 
 		if !form.Validate() {
 			h.sessions.Put(r.Context(), "form", form)
 			http.Redirect(w, r, r.Referer(), http.StatusFound)
 			return
 		}
-		fmt.Println("here3")
 
 		// hash the password with bcrypt
 		password, err := bcrypt.GenerateFromPassword([]byte(form.Password), bcrypt.DefaultCost)
@@ -64,7 +56,6 @@ func (h *UserHandler) RegisterSubmit() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Println("here4")
 
 		err = h.store.CreateUser(&godiscuss.User{
 			ID:       uuid.New(),
