@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 
@@ -8,6 +9,7 @@ import (
 	godiscuss "github.com/andreijy/go-discuss"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 )
 
@@ -30,6 +32,7 @@ func NewHandler(store godiscuss.Store, sessions *scs.SessionManager) *Handler {
 	// TODO: h.Use(csrf.Protect(csrfKey))
 	h.Use(csrf.Protect(csrfKey, csrf.Secure(false)))
 	h.Use(sessions.LoadAndSave)
+	h.Use(h.withUser)
 
 	h.Get("/", h.Home())
 	h.Route("/threads", func(r chi.Router) {
@@ -47,6 +50,9 @@ func NewHandler(store godiscuss.Store, sessions *scs.SessionManager) *Handler {
 	h.Get("/comments/{id}/vote", commentHandler.Vote())
 	h.Get("/register", userHandler.Register())
 	h.Post("/register", userHandler.RegisterSubmit())
+	h.Get("/login", userHandler.Login())
+	h.Post("/login", userHandler.LoginSubmit())
+	h.Get("/logout", userHandler.Logout())
 
 	return h
 }
@@ -77,4 +83,19 @@ func (h *Handler) Home() http.HandlerFunc {
 			Posts:       pp,
 		})
 	}
+}
+
+func (h *Handler) withUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, _ := h.sessions.Get(r.Context(), "user_id").(uuid.UUID)
+
+		user, err := h.store.User(id)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), "user", user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

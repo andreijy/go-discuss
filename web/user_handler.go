@@ -71,3 +71,54 @@ func (h *UserHandler) RegisterSubmit() http.HandlerFunc {
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }
+
+// To handle h.Get("/login", userHandler.Login())
+func (h *UserHandler) Login() http.HandlerFunc {
+	type data struct {
+		SessionData
+		CSRF template.HTML
+	}
+	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/user_login.html"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		tmpl.Execute(w, data{
+			SessionData: GetSessionData(h.sessions, r.Context()),
+			CSRF:        csrf.TemplateField(r)})
+	}
+}
+
+// To handle h.Post("/login", userHandler.LoginSubmit())
+func (h *UserHandler) LoginSubmit() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		form := LoginForm{
+			Username:             r.FormValue("username"),
+			Password:             r.FormValue("password"),
+			IncorrectCredentials: false,
+		}
+
+		user, err := h.store.UserByUsername(form.Username)
+		if err != nil {
+			form.IncorrectCredentials = true
+		} else {
+			compareErr := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(form.Password))
+			form.IncorrectCredentials = compareErr != nil
+		}
+
+		if !form.Validate() {
+			h.sessions.Put(r.Context(), "form", form)
+			http.Redirect(w, r, r.Referer(), http.StatusFound)
+			return
+		}
+
+		h.sessions.Put(r.Context(), "user_id", user.ID)
+		h.sessions.Put(r.Context(), "flash", "You have been logged in successfully.")
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+}
+
+func (h *UserHandler) Logout() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h.sessions.Remove(r.Context(), "user_id")
+		h.sessions.Put(r.Context(), "flash", "You have been logged out successfully.")
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+}
